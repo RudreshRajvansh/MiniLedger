@@ -1,0 +1,27 @@
+# Runs PostgreSQL 16 for local development.
+# On first startup, also creates the test database via init-db.sh.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: miniledger-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: miniledger
+      POSTGRES_PASSWORD: miniledger
+      POSTGRES_DB: miniledger
+    volumes:
+      # Named volume persists data across container restarts
+      - pgdata:/var/lib/postgresql/data
+      # Postgres runs scripts in this dir on first init (empty volume only)
+      - ./init-db.sh:/docker-entrypoint-initdb.d/init-db.sh
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U miniledger"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  pgdata:
