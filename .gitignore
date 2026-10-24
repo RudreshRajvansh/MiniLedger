@@ -1,7 +1,45 @@
+# Dependencies
 node_modules/
+
+# Environment & secrets (keep only the committed example)
 .env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.p8
+*.jks
+*.keystore
+*.mobileprovision
+google-services.json
+GoogleService-Info.plist
+
+# Build output
 dist/
+build/
+web-build/
+*.apk
+*.aab
+*.ipa
+
+# Expo
+.expo/
+.expo-shared/
+
+# User-uploaded receipts (may contain personal data)
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# Test coverage
+coverage/
+
+# Logs
 *.log
+npm-debug.log*
+
+# OS / editor
 .DS_Store
 Thumbs.db
-.expo/
+.idea/
+.vscode/
