@@ -190,7 +190,7 @@ npm test
 
 ### What the test suite covers:
 - **Auth**: Request OTP, invalid phone rejection, 30s per-phone cooldown, SHA-256 hash comparison, expired OTP rejection, anti-replay, 5-attempt lockout, user upsert, and JWT token issuance.
-- **Loans**: Creation validation, positive amount check, ISO date validation, past-date allowance, atomic repay, 409 already-repaid conflict, 404 non-existent loan.
+- **Loans**: Creation validation, positive amount check, ISO date validation, past-date allowance, atomic repay, 409 already-repaid conflict, 404 non-existent loan, delete (204, cross-user 404, malformed id 400).
 - **Summary**: Exact mathematical validation against seeded known loans (repaid, pending, overdue) using `SUM FILTER` and `COALESCE`.
 - **Authorization Isolation**: User A is strictly forbidden from viewing, listing, or repaying User B's loans.
 - **Receipts**: Valid image uploads, non-image rejection (400), and >5MB file rejection (413).
@@ -327,6 +327,25 @@ curl -X POST http://localhost:3000/api/loans/c1f6b8a2-2b6d-4950-84c4-f2a8932fa5a
   -H "Authorization: Bearer <TOKEN>" \
   -F "receipt=@/path/to/receipt.jpg"
 ```
+
+### 8. Delete Loan
+- **Endpoint**: `DELETE /api/loans/:id`
+- **Headers**: `Authorization: Bearer <TOKEN>`
+- **Response**: `204 No Content`. Scoped to the owner in a single `DELETE ... WHERE id = $1 AND user_id = $2`, so another user's loan returns `404`. The stored receipt file is removed best-effort.
+- **cURL**:
+```bash
+curl -X DELETE http://localhost:3000/api/loans/c1f6b8a2-2b6d-4950-84c4-f2a8932fa5a2   -H "Authorization: Bearer <TOKEN>"
+```
+
+---
+
+## 📱 Mobile App Features
+
+- **Dashboard**: balance card with outstanding amount, recovery progress bar, and lent / repaid / overdue totals; name search; filter tabs with live counts; skeleton loading and animated cards.
+- **Loan details**: tap any loan for a timeline (added → due → repaid), receipt preview or attach-later, mark repaid, and delete.
+- **Friendly reminders**: one tap opens the share sheet (WhatsApp, SMS, …) with a polite, pre-written message. The tone adapts to whether the loan is upcoming or overdue. Nothing is sent automatically.
+- **Fast entry**: quick-pick amounts and due dates, live "Save ₹1,800 to Rahul" button.
+- **Feedback**: toast confirmations for save, repay, delete and receipt upload.
 
 ---
 

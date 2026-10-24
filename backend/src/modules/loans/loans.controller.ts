@@ -1,4 +1,7 @@
+import fs from 'fs';
+import path from 'path';
 import { Request, Response } from 'express';
+import { env } from '../../config/env';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { AppError } from '../../utils/AppError';
 import * as loansService from './loans.service';
@@ -66,4 +69,24 @@ export const handleUploadReceipt = asyncHandler(async (req: Request, res: Respon
   );
 
   res.json(loan);
+});
+
+export const handleDeleteLoan = asyncHandler(async (req: Request, res: Response) => {
+  const userId = req.userId!;
+  const paramResult = loanIdParamSchema.safeParse(req.params);
+
+  if (!paramResult.success) {
+    throw new AppError(400, 'VALIDATION_ERROR', 'Invalid loan ID format (must be UUID)');
+  }
+
+  const { receiptPath } = await loansService.deleteLoan(userId, paramResult.data.id);
+
+  // Best-effort cleanup of the receipt file; the DB row is already gone
+  if (receiptPath) {
+    fs.promises
+      .unlink(path.join(path.resolve(env.UPLOAD_DIR), path.basename(receiptPath)))
+      .catch(() => undefined);
+  }
+
+  res.status(204).send();
 });

@@ -228,3 +228,26 @@ export async function attachReceipt(
 
   return mapLoanRow(result.rows[0]);
 }
+
+// ─── Delete Loan ────────────────────────────────────────────────
+
+/**
+ * Permanently deletes a loan owned by the user (e.g. an entry logged by mistake).
+ * Returns the stored receipt filename (if any) so the caller can remove the file.
+ */
+export async function deleteLoan(
+  userId: string,
+  loanId: string,
+): Promise<{ receiptPath: string | null }> {
+  // Single atomic delete scoped to the owner; no row means not found (or not theirs)
+  const result = await query<{ receipt_path: string | null }>(
+    'DELETE FROM loans WHERE id = $1 AND user_id = $2 RETURNING receipt_path',
+    [loanId, userId],
+  );
+
+  if (result.rows.length === 0) {
+    throw new AppError(404, 'NOT_FOUND', 'Loan not found');
+  }
+
+  return { receiptPath: result.rows[0].receipt_path };
+}

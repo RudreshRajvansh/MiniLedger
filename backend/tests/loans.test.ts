@@ -168,6 +168,56 @@ describe('Loans Module', () => {
     });
   });
 
+  describe('DELETE /api/loans/:id', () => {
+    it('deletes own loan with 204 and it is gone afterwards', async () => {
+      const created = await request(app)
+        .post('/api/loans')
+        .set('Authorization', `Bearer ${userA.token}`)
+        .send({ friendName: 'Typo Entry', amount: 100, dueDate: '2026-12-01' });
+
+      const res = await request(app)
+        .delete(`/api/loans/${created.body.id}`)
+        .set('Authorization', `Bearer ${userA.token}`);
+
+      expect(res.status).toBe(204);
+
+      const getRes = await request(app)
+        .get(`/api/loans/${created.body.id}`)
+        .set('Authorization', `Bearer ${userA.token}`);
+
+      expect(getRes.status).toBe(404);
+    });
+
+    it("returns 404 when user A attempts to delete user B's loan (and it survives)", async () => {
+      const bLoan = await request(app)
+        .post('/api/loans')
+        .set('Authorization', `Bearer ${userB.token}`)
+        .send({ friendName: 'Friend B', amount: 2000, dueDate: '2026-12-01' });
+
+      const res = await request(app)
+        .delete(`/api/loans/${bLoan.body.id}`)
+        .set('Authorization', `Bearer ${userA.token}`);
+
+      expect(res.status).toBe(404);
+      expect(res.body.error.code).toBe('NOT_FOUND');
+
+      const stillThere = await request(app)
+        .get(`/api/loans/${bLoan.body.id}`)
+        .set('Authorization', `Bearer ${userB.token}`);
+
+      expect(stillThere.status).toBe(200);
+    });
+
+    it('returns 400 for a malformed loan id', async () => {
+      const res = await request(app)
+        .delete('/api/loans/not-a-uuid')
+        .set('Authorization', `Bearer ${userA.token}`);
+
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    });
+  });
+
   describe('Authorization Isolation & Filtering', () => {
     it('user A cannot view or list user B loans', async () => {
       // Create a loan for user A

@@ -8,12 +8,15 @@ import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { LoginScreen } from './src/screens/LoginScreen';
 import { LoansListScreen } from './src/screens/LoansListScreen';
 import { AddLoanScreen } from './src/screens/AddLoanScreen';
+import { LoanDetailScreen } from './src/screens/LoanDetailScreen';
+import { ToastProvider } from './src/context/ToastContext';
 import { colors, radius, shadow } from './src/theme';
 
 export type RootStackParamList = {
   Login: undefined;
   LoansList: undefined;
   AddLoan: undefined;
+  LoanDetail: { loanId: string };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -76,6 +79,11 @@ function AppNavigation() {
               component={AddLoanScreen}
               options={{ title: 'New loan', headerShown: true }}
             />
+            <Stack.Screen
+              name="LoanDetail"
+              component={LoanDetailScreen}
+              options={{ title: 'Loan details', headerShown: true }}
+            />
           </>
         )}
       </Stack.Navigator>
@@ -101,7 +109,9 @@ export default function App() {
     <SafeAreaProvider>
       <AuthProvider>
         <DeviceFrame>
-          <AppNavigation />
+          <ToastProvider>
+            <AppNavigation />
+          </ToastProvider>
         </DeviceFrame>
       </AuthProvider>
     </SafeAreaProvider>

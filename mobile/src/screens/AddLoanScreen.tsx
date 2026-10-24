@@ -12,7 +12,6 @@ import {
   KeyboardAvoidingView,
 } from 'react-native';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
-import * as ImagePicker from 'expo-image-picker';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { createLoan, uploadReceipt } from '../api/loans.api';
@@ -22,6 +21,8 @@ import { formatCurrency } from '../utils/formatCurrency';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { Avatar } from '../components/Avatar';
+import { useToast } from '../context/ToastContext';
+import { pickReceiptImage } from '../utils/pickImage';
 import { colors, radius, shadow, spacing } from '../theme';
 
 const QUICK_AMOUNTS = [500, 1000, 2000, 5000];
@@ -34,6 +35,7 @@ const QUICK_DUE = [
 export const AddLoanScreen: React.FC = () => {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
+  const { showToast } = useToast();
 
   // Form fields
   const [friendName, setFriendName] = useState('');
@@ -89,49 +91,9 @@ export const AddLoanScreen: React.FC = () => {
     }
   };
 
-  const pickFromLibrary = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission Denied', 'Photo gallery permission is required.');
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      quality: 0.8,
-    });
-    if (!result.canceled && result.assets[0]?.uri) {
-      setReceiptUri(result.assets[0].uri);
-    }
-  };
-
-  const pickFromCamera = async () => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission Denied', 'Camera permission is required.');
-      return;
-    }
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      quality: 0.8,
-    });
-    if (!result.canceled && result.assets[0]?.uri) {
-      setReceiptUri(result.assets[0].uri);
-    }
-  };
-
-  const handlePickImage = () => {
-    // Browsers have no camera/gallery choice sheet; open the file picker directly
-    if (Platform.OS === 'web') {
-      pickFromLibrary();
-      return;
-    }
-    Alert.alert('Attach receipt', 'Choose source:', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Camera', onPress: pickFromCamera },
-      { text: 'Photo Gallery', onPress: pickFromLibrary },
-    ]);
+  const handlePickImage = async () => {
+    const uri = await pickReceiptImage();
+    if (uri) setReceiptUri(uri);
   };
 
   const handleSubmit = async () => {
@@ -163,6 +125,7 @@ export const AddLoanScreen: React.FC = () => {
         }
       }
 
+      showToast(`${formatCurrency(newLoan.amount)} to ${newLoan.friendName.split(' ')[0]} saved`);
       navigation.goBack();
     } catch (err) {
       setGeneralError(getErrorMessage(err));

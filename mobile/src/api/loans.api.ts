@@ -55,6 +55,10 @@ export async function repayLoan(id: string): Promise<Loan> {
   return res.data;
 }
 
+export async function deleteLoan(id: string): Promise<void> {
+  await apiClient.delete(`/loans/${id}`);
+}
+
 export async function getSummary(): Promise<Summary> {
   const res = await apiClient.get<Summary>('/summary');
   return res.data;

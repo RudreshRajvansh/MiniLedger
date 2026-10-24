@@ -6,7 +6,6 @@ import {
   StyleSheet,
   Pressable,
   RefreshControl,
-  ActivityIndicator,
   Modal,
   Image,
   TextInput,
@@ -22,6 +21,9 @@ import { LoanItem } from '../components/LoanItem';
 import { EmptyState } from '../components/EmptyState';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { FilterTabs, FilterOption } from '../components/FilterTabs';
+import { LoanSkeleton } from '../components/LoanSkeleton';
+import { useToast } from '../context/ToastContext';
+import { formatCurrency } from '../utils/formatCurrency';
 import { confirmAction } from '../utils/confirm';
 import { colors, radius, shadow, spacing } from '../theme';
 import type { RootStackParamList } from '../../App';
@@ -46,6 +48,7 @@ export const LoansListScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const insets = useSafeAreaInsets();
   const { user, logout } = useAuth();
+  const { showToast } = useToast();
 
   const [loans, setLoans] = useState<Loan[]>([]);
   const [summary, setSummary] = useState<Summary | null>(null);
@@ -102,7 +105,8 @@ export const LoansListScreen: React.FC = () => {
   const handleRepay = async (loanId: string) => {
     setRepayingId(loanId);
     try {
-      await repayLoan(loanId);
+      const repaid = await repayLoan(loanId);
+      showToast(`${formatCurrency(repaid.amount)} from ${repaid.friendName.split(' ')[0]} settled`);
       // Immediately refresh list and summary
       await loadData(activeFilter);
     } catch (err) {
@@ -232,20 +236,19 @@ export const LoansListScreen: React.FC = () => {
             <View style={{ height: spacing.md }} />
           </View>
         }
-        renderItem={({ item }) => (
+        renderItem={({ item, index }) => (
           <LoanItem
             loan={item}
             onRepay={handleRepay}
             onOpenReceipt={(url) => setPreviewReceiptUrl(url)}
+            onPress={(loan) => navigation.navigate('LoanDetail', { loanId: loan.id })}
             isRepaying={repayingId === item.id}
+            index={index}
           />
         )}
         ListEmptyComponent={
           loading && !refreshing ? (
-            <View style={styles.loaderContainer}>
-              <ActivityIndicator size="large" color={colors.primary} />
-              <Text style={styles.loadingText}>Loading your ledger…</Text>
-            </View>
+            <LoanSkeleton count={4} />
           ) : (
             <EmptyState
               emoji={emptyCopy.emoji}
@@ -411,15 +414,6 @@ const styles = StyleSheet.create({
   },
   listContent: {
     flexGrow: 1,
-  },
-  loaderContainer: {
-    paddingVertical: 48,
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: spacing.md,
-    color: colors.textMuted,
-    fontSize: 14,
   },
   fab: {
     position: 'absolute',
