@@ -1,5 +1,12 @@
 import React from 'react';
-import { View, ActivityIndicator, StyleSheet, Platform, Text } from 'react-native';
+import {
+  View,
+  ActivityIndicator,
+  StyleSheet,
+  Platform,
+  Text,
+  useWindowDimensions,
+} from 'react-native';
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -96,7 +103,9 @@ function AppNavigation() {
  * web demo looks like the mobile app it is. Native builds are unaffected.
  */
 const DeviceFrame: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  if (Platform.OS !== 'web') return <>{children}</>;
+  const { width } = useWindowDimensions();
+  // Native builds and phone-sized browsers already are a phone; no frame needed
+  if (Platform.OS !== 'web' || width < 520) return <>{children}</>;
   return (
     <View style={styles.webBackdrop}>
       <View style={styles.webDevice}>{children}</View>

@@ -1,289 +1,158 @@
-# MiniLedger 📒
+# MiniLedger
 
-A full-stack mobile application to track money lent to friends and colleagues. Built with **Node.js, Express, TypeScript, PostgreSQL (raw SQL), and React Native (Expo)**.
+A small app for keeping track of money you've lent to friends.
 
----
+You know how it goes: you cover someone's dinner, spot a colleague some cash for a cab, and three weeks later neither of you remembers the amount. MiniLedger keeps a simple record of who owes you what and when they said they'd pay it back. It tells you when something is overdue and even writes a polite reminder for you.
 
-## 📑 Table of Contents
+It's a full-stack project: a **React Native (Expo)** app talking to a **Node.js + Express + PostgreSQL** API, all in TypeScript.
 
-- [Overview & Architecture](#overview--architecture)
-- [Tech Stack](#tech-stack)
-- [Prerequisites](#prerequisites)
-- [Step-by-Step Setup](#step-by-step-setup)
-- [Where to Find the Mock OTP](#where-to-find-the-mock-otp)
-- [Environment Variables](#environment-variables)
-- [Running Automated Tests](#running-automated-tests)
-- [API Reference (with cURL examples)](#api-reference)
-- [Design Decisions & Assumptions](#design-decisions--assumptions)
-- [Known Limitations & Future Improvements](#known-limitations--future-improvements)
-
----
-
-## 🏛 Overview & Architecture
-
-MiniLedger follows a clean, layered architecture without heavy ORM magic so that every line of SQL and business logic is clear and interview-ready:
-
-```
-miniledger/
-├── backend/
-│   ├── src/
-│   │   ├── config/          # Zod env validation, pg connection pool
-│   │   ├── db/migrations/   # Raw SQL schema migrations (001, 002, 003)
-│   │   ├── middleware/      # JWT auth, Zod validation, error handler, Multer, rate limit
-│   │   ├── modules/
-│   │   │   ├── auth/        # OTP generation/verification & JWT issuing
-│   │   │   ├── loans/       # Loan CRUD, atomic repay, computed overdue logic
-│   │   │   └── summary/     # Single-query financial aggregation (SUM FILTER)
-│   │   ├── utils/           # Custom AppError, asyncHandler, Indian phone normalizer
-│   │   ├── app.ts           # Express app definition (exported for supertest)
-│   │   └── server.ts        # Server listener and graceful shutdown
-│   └── tests/               # Integration tests (auth, loans, summary, receipts)
-└── mobile/
-    ├── src/
-    │   ├── api/             # Axios client, auth/loans/summary endpoints
-    │   ├── context/         # AuthContext with expo-secure-store persistence
-    │   ├── components/      # SummaryCard, LoanItem, PrimaryButton, EmptyState, ErrorBanner
-    │   ├── screens/         # LoginScreen, LoansListScreen, AddLoanScreen
-    │   ├── utils/           # Indian Rupee formatCurrency (₹), date helpers
-    │   └── config.ts        # Configurable API base URL (10.0.2.2 vs localhost vs LAN IP)
-    └── App.tsx              # React Navigation native stack
-```
+<table>
+  <tr>
+    <td align="center"><img src="docs/screenshots/01-login.png" width="230" alt="Login screen"/><br/><sub>Sign in with your phone</sub></td>
+    <td align="center"><img src="docs/screenshots/02-otp.png" width="230" alt="OTP screen"/><br/><sub>One-time code, no passwords</sub></td>
+    <td align="center"><img src="docs/screenshots/03-dashboard.png" width="230" alt="Dashboard"/><br/><sub>Everything owed, at a glance</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/04-loan-details.png" width="230" alt="Loan details"/><br/><sub>Timeline, receipt and actions</sub></td>
+    <td align="center"><img src="docs/screenshots/05-add-loan.png" width="230" alt="Add a loan"/><br/><sub>Logging a loan takes seconds</sub></td>
+    <td align="center"><img src="docs/screenshots/06-repaid-filter.png" width="230" alt="Repaid loans"/><br/><sub>Filter by status</sub></td>
+  </tr>
+</table>
 
 ---
 
-## 🛠 Tech Stack
+## What it does
 
-### Backend
-- **Runtime & Language**: Node.js 20+, TypeScript (strict mode, zero `any`)
-- **HTTP Server**: Express.js
-- **Database**: PostgreSQL 16 via native `pg` driver (no ORM, pure SQL migrations)
-- **Validation**: `zod`
-- **Authentication**: JWT (`jsonwebtoken`) with SHA-256 OTP hashing & constant-time comparison
-- **File Uploads**: `multer` with random hex filenames, MIME whitelist, and 5 MB limit
-- **Security & Utilities**: `helmet`, `cors`, `express-rate-limit`, `pino`
-- **Testing**: Jest, Supertest, ts-jest (100% integration tests against test database)
-
-### Mobile App
-- **Framework**: React Native with Expo (TypeScript template)
-- **Navigation**: React Navigation (Native Stack)
-- **State Management**: React Context + Hooks (`AuthContext`)
-- **Storage**: `expo-secure-store` (encrypted on-device token storage)
-- **Networking**: `axios` with request/response interceptors for Bearer auth & automatic 401 handling
-- **Native Modules**: `expo-image-picker` (camera & gallery) and `@react-native-community/datetimepicker`
-
-### Infrastructure
-- `docker-compose.yml` for PostgreSQL 16 with persistent volume and automatic test DB provisioning.
+- **Phone + OTP login.** No passwords to remember. In development the "SMS" is printed in the backend terminal.
+- **A dashboard that answers the real question:** how much is still out there? You see the outstanding amount, how much has been recovered so far, and what's overdue.
+- **Overdue loans stand out.** They're sorted to the top, marked in red, and show exactly how many days late they are.
+- **Quick entry.** Tap an amount chip, type a name, pick "2 weeks" and you're done. Past dates are allowed, because people usually log loans after the fact.
+- **Receipts.** Attach a photo (camera or gallery) when you add a loan, or later from the loan's detail page.
+- **Friendly reminders.** One tap opens your share sheet (WhatsApp, SMS, …) with a polite, pre-written message. The wording changes depending on whether the loan is coming up or already late. Nothing is ever sent without you.
+- **Loan details.** Each loan has a timeline (added → due → repaid), its receipt, and actions to mark it repaid or delete it.
+- **Search and filters** by name and status (all, pending, overdue, repaid), with live counts.
 
 ---
 
-## 📋 Prerequisites
+## Tech stack
 
-- **Node.js**: v20.x or higher
-- **npm**: v10.x or higher
-- **Docker & Docker Compose**: (or local PostgreSQL 16+ on port 5432)
-- **Expo Go App**: on your physical iOS/Android phone (or Android Studio emulator / iOS Simulator)
+| | |
+|---|---|
+| **Mobile** | React Native with Expo, TypeScript, React Navigation, React Context, `expo-secure-store`, `expo-image-picker`, axios |
+| **Backend** | Node.js, Express, TypeScript (strict), PostgreSQL via `pg` with plain SQL (no ORM), Zod, JWT, Multer, Helmet, express-rate-limit, Pino |
+| **Testing** | Jest + Supertest integration tests against a real test database |
+| **Infra** | `docker-compose.yml` for PostgreSQL 16 |
+
+I deliberately skipped an ORM. Every query is plain SQL, so it's easy to see exactly what hits the database and why.
 
 ---
 
-## 🚀 Step-by-Step Setup
+## Running it locally
 
-### 1. Start the Database with Docker
+You'll need **Node.js 20+**, and either **Docker** or a local **PostgreSQL 16+** on port 5432.
+
+### 1. Start the database
 
 ```bash
-cd miniledger
 docker compose up -d
 ```
-*This starts PostgreSQL 16 and automatically creates both `miniledger` and `miniledger_test` databases.*
 
-### 2. Configure & Run Backend
+This starts Postgres and creates two databases: `miniledger` for the app and `miniledger_test` for the tests.
+
+> Using your own Postgres instead? Create a `miniledger` user (password `miniledger`) and both databases yourself. `init-db.sh` shows what's needed.
+
+### 2. Start the backend
 
 ```bash
 cd backend
-
-# Copy environment variables
-cp .env.example .env
-
-# Install backend dependencies
+cp .env.example .env      # then set a real JWT_SECRET
 npm install
-
-# Run database migrations
 npm run migrate
-
-# Start backend in development mode (with hot reloading via tsx)
 npm run dev
 ```
 
-The API will start on `http://localhost:3000`. You can test it by visiting:
-```bash
-curl http://localhost:3000/health
-# {"status":"ok","timestamp":"2026-10-23T..."}
-```
+The API runs on `http://localhost:3000`. `curl http://localhost:3000/health` should return `{"status":"ok",...}`.
 
-### 3. Configure & Run Mobile App
-
-Open `mobile/src/config.ts` and set your API URL based on how you are running the app:
-- **Android Emulator**: `http://10.0.2.2:3000` (default)
-- **iOS Simulator / Web**: `http://localhost:3000`
-- **Physical Device (Expo Go)**: `http://<YOUR_COMPUTER_LOCAL_IP>:3000` (e.g., `http://192.168.1.15:3000`)
-
-Then run:
-
-```bash
-cd ../mobile
-npm install
-npm run start
-```
-Scan the QR code displayed in your terminal using the **Expo Go** app on Android or the iOS Camera app.
-
-### 4. (Optional) Run the App in a Browser
-
-No phone or emulator handy? The app also runs on the web, shown inside a phone-sized frame:
+### 3. Start the app
 
 ```bash
 cd mobile
-npm run web
+npm install
+npm run start
 ```
 
-Open `http://localhost:8081`. On web, the session is kept in `localStorage` (instead of SecureStore) and the date picker and receipt upload use the browser's native inputs.
+Scan the QR code with **Expo Go**. If you're on a real phone, first point `mobile/src/config.ts` at your computer's LAN IP (for example `http://192.168.1.15:3000`). The Android emulator (`10.0.2.2`) and the iOS simulator (`localhost`) work out of the box.
 
----
+**No phone handy?** Run `npm run web` and open `http://localhost:8081`. The app works in the browser too. On a desktop it's shown inside a phone-sized frame.
 
-## 🔑 Where to Find the Mock OTP
+### 4. Log in
 
-MiniLedger uses a simulated SMS service for development. When you request an OTP from the app or cURL:
+Enter any 10-digit Indian mobile number. Then look at the terminal running the backend for a line like this:
 
-1. Look at the **terminal window running `npm run dev` in `backend`**.
-2. You will see a clearly formatted banner:
 ```text
-==================================================
 [MOCK OTP] +919876543210 -> 491777 (valid for 5 minutes)
-==================================================
 ```
-3. Enter this 6-digit code on the mobile app's verification screen.
-4. The OTP is **never** leaked in the HTTP response.
+
+Type that code into the app. The code is never included in the API response; it only appears in the server log.
 
 ---
 
-## ⚙️ Environment Variables
+## Configuration
 
-Located in `backend/.env`:
+Everything lives in `backend/.env` (copy it from `.env.example`). The real `.env` is git-ignored.
 
-| Variable | Default Value | Description |
+| Variable | Default | What it's for |
 |---|---|---|
-| `PORT` | `3000` | Port for the Express HTTP server |
-| `DATABASE_URL` | `postgresql://miniledger:miniledger@localhost:5432/miniledger` | Main PostgreSQL connection string |
-| `JWT_SECRET` | `change-me-to-a-random-string` | Secret key used to sign and verify JWT tokens (min 16 chars) |
-| `OTP_TTL_SECONDS` | `300` | Lifetime of an OTP code before expiry (5 minutes) |
-| `UPLOAD_DIR` | `uploads` | Directory for stored receipt images |
-| `PUBLIC_BASE_URL` | `http://localhost:3000` | Base URL used to construct absolute `receiptUrl` links |
+| `PORT` | `3000` | API port |
+| `DATABASE_URL` | `postgresql://miniledger:miniledger@localhost:5432/miniledger` | Main database. Tests automatically use `miniledger_test`. |
+| `JWT_SECRET` | `change-me-to-a-random-string` | Signs login tokens. Use a long random value (16+ characters). |
+| `OTP_TTL_SECONDS` | `300` | How long a login code stays valid |
+| `UPLOAD_DIR` | `uploads` | Where receipt images are stored |
+| `PUBLIC_BASE_URL` | `http://localhost:3000` | Used to build receipt image URLs |
+
+A quick way to generate a secret:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
 
 ---
 
-## 🧪 Running Automated Tests
-
-Tests run against the isolated `miniledger_test` database and cover auth, validation, rate limiting, atomic repay, isolation, and file upload edge cases:
+## Tests
 
 ```bash
 cd backend
 npm test
 ```
 
-### What the test suite covers:
-- **Auth**: Request OTP, invalid phone rejection, 30s per-phone cooldown, SHA-256 hash comparison, expired OTP rejection, anti-replay, 5-attempt lockout, user upsert, and JWT token issuance.
-- **Loans**: Creation validation, positive amount check, ISO date validation, past-date allowance, atomic repay, 409 already-repaid conflict, 404 non-existent loan, delete (204, cross-user 404, malformed id 400).
-- **Summary**: Exact mathematical validation against seeded known loans (repaid, pending, overdue) using `SUM FILTER` and `COALESCE`.
-- **Authorization Isolation**: User A is strictly forbidden from viewing, listing, or repaying User B's loans.
-- **Receipts**: Valid image uploads, non-image rejection (400), and >5MB file rejection (413).
+There are 26 integration tests. They make real HTTP requests to the real database, with nothing mocked. They cover:
+
+- **Auth:** invalid numbers, the 30-second resend cooldown, expired codes, codes that can't be reused, lockout after 5 wrong attempts, and token issuing.
+- **Loans:** validation (empty names, zero or negative amounts, bad dates), past due dates, mark-as-repaid (including a second attempt returning `409`), and delete.
+- **Isolation:** one user can never see, repay or delete another user's loans. They get a `404`, so they can't even tell the loan exists.
+- **Summary:** totals checked against a known set of repaid, pending and overdue loans.
+- **Receipts:** valid uploads, non-images rejected (`400`), and files over 5 MB rejected (`413`).
 
 ---
 
-## 📡 API Reference
+## API
 
-All requests and responses use JSON (except `/receipt` upload). Errors strictly follow:
-```json
-{
-  "error": {
-    "code": "VALIDATION_ERROR",
-    "message": "Friend name is required",
-    "details": []
-  }
-}
-```
+All endpoints except the auth ones need an `Authorization: Bearer <token>` header.
 
-### 1. Request OTP
-- **Endpoint**: `POST /api/auth/request-otp`
-- **cURL**:
-```bash
-curl -X POST http://localhost:3000/api/auth/request-otp \
-  -H "Content-Type: application/json" \
-  -d '{"phone": "9876543210"}'
-```
-- **Response** `(200 OK)`:
-```json
-{
-  "message": "OTP sent successfully (check server console)",
-  "expiresInSeconds": 300
-}
-```
+| Method | Endpoint | What it does |
+|---|---|---|
+| `POST` | `/api/auth/request-otp` | Sends a login code to `{ phone }` |
+| `POST` | `/api/auth/verify-otp` | Swaps `{ phone, otp }` for a JWT |
+| `GET` | `/api/summary` | Totals: lent, repaid, pending, overdue, plus counts |
+| `GET` | `/api/loans?status=all\|pending\|overdue\|repaid` | Lists loans: overdue first, then by due date |
+| `POST` | `/api/loans` | Creates a loan from `{ friendName, amount, dueDate }` |
+| `GET` | `/api/loans/:id` | Returns one loan |
+| `PATCH` | `/api/loans/:id/repay` | Marks it repaid |
+| `POST` | `/api/loans/:id/receipt` | Uploads a receipt (`multipart/form-data`, field `receipt`) |
+| `DELETE` | `/api/loans/:id` | Deletes a loan logged by mistake |
 
-### 2. Verify OTP & Log In
-- **Endpoint**: `POST /api/auth/verify-otp`
-- **cURL**:
-```bash
-curl -X POST http://localhost:3000/api/auth/verify-otp \
-  -H "Content-Type: application/json" \
-  -d '{"phone": "9876543210", "otp": "123456"}'
-```
-- **Response** `(200 OK)`:
-```json
-{
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "user": {
-    "id": "e8d975a2-9b2f-48d6-953e-5f994fbc6811",
-    "phone": "+919876543210"
-  }
-}
-```
+A typical loan looks like this:
 
-### 3. Get Financial Summary
-- **Endpoint**: `GET /api/summary`
-- **Headers**: `Authorization: Bearer <TOKEN>`
-- **cURL**:
-```bash
-curl -X GET http://localhost:3000/api/summary \
-  -H "Authorization: Bearer <TOKEN>"
-```
-- **Response** `(200 OK)`:
-```json
-{
-  "totalLent": 7000,
-  "totalRepaid": 2000,
-  "totalPending": 5000,
-  "overdueAmount": 1500,
-  "counts": {
-    "total": 3,
-    "repaid": 1,
-    "pending": 2,
-    "overdue": 1
-  }
-}
-```
-
-### 4. Create Loan
-- **Endpoint**: `POST /api/loans`
-- **Headers**: `Authorization: Bearer <TOKEN>`
-- **cURL**:
-```bash
-curl -X POST http://localhost:3000/api/loans \
-  -H "Authorization: Bearer <TOKEN>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "friendName": "Rohan Sharma",
-    "amount": 2500,
-    "dueDate": "2026-11-20"
-  }'
-```
-- **Response** `(201 Created)`:
 ```json
 {
   "id": "c1f6b8a2-2b6d-4950-84c4-f2a8932fa5a2",
@@ -299,86 +168,95 @@ curl -X POST http://localhost:3000/api/loans \
 }
 ```
 
-### 5. List Loans
-- **Endpoint**: `GET /api/loans?status=all|pending|overdue|repaid`
-- **Headers**: `Authorization: Bearer <TOKEN>`
-- **cURL**:
-```bash
-curl -X GET "http://localhost:3000/api/loans?status=all" \
-  -H "Authorization: Bearer <TOKEN>"
+Errors always have the same shape, so the app can show them without special-casing:
+
+```json
+{ "error": { "code": "VALIDATION_ERROR", "message": "Friend name is required", "details": [] } }
 ```
 
-### 6. Atomic Mark as Repaid
-- **Endpoint**: `PATCH /api/loans/:id/repay`
-- **Headers**: `Authorization: Bearer <TOKEN>`
-- **cURL**:
+<details>
+<summary>Example requests with curl</summary>
+
 ```bash
-curl -X PATCH http://localhost:3000/api/loans/c1f6b8a2-2b6d-4950-84c4-f2a8932fa5a2/repay \
-  -H "Authorization: Bearer <TOKEN>"
+# 1. Ask for a code (then read it from the backend terminal)
+curl -X POST http://localhost:3000/api/auth/request-otp \
+  -H "Content-Type: application/json" -d '{"phone": "9876543210"}'
+
+# 2. Log in
+curl -X POST http://localhost:3000/api/auth/verify-otp \
+  -H "Content-Type: application/json" -d '{"phone": "9876543210", "otp": "123456"}'
+
+# 3. Add a loan
+curl -X POST http://localhost:3000/api/loans \
+  -H "Authorization: Bearer <TOKEN>" -H "Content-Type: application/json" \
+  -d '{"friendName": "Rohan Sharma", "amount": 2500, "dueDate": "2026-11-20"}'
+
+# 4. Mark it repaid
+curl -X PATCH http://localhost:3000/api/loans/<LOAN_ID>/repay -H "Authorization: Bearer <TOKEN>"
+
+# 5. Attach a receipt
+curl -X POST http://localhost:3000/api/loans/<LOAN_ID>/receipt \
+  -H "Authorization: Bearer <TOKEN>" -F "receipt=@/path/to/receipt.jpg"
 ```
 
-### 7. Upload Receipt Image
-- **Endpoint**: `POST /api/loans/:id/receipt`
-- **Headers**: `Authorization: Bearer <TOKEN>`
-- **Body**: `multipart/form-data` with field name `receipt`
-- **cURL**:
-```bash
-curl -X POST http://localhost:3000/api/loans/c1f6b8a2-2b6d-4950-84c4-f2a8932fa5a2/receipt \
-  -H "Authorization: Bearer <TOKEN>" \
-  -F "receipt=@/path/to/receipt.jpg"
-```
+</details>
 
-### 8. Delete Loan
-- **Endpoint**: `DELETE /api/loans/:id`
-- **Headers**: `Authorization: Bearer <TOKEN>`
-- **Response**: `204 No Content`. Scoped to the owner in a single `DELETE ... WHERE id = $1 AND user_id = $2`, so another user's loan returns `404`. The stored receipt file is removed best-effort.
-- **cURL**:
-```bash
-curl -X DELETE http://localhost:3000/api/loans/c1f6b8a2-2b6d-4950-84c4-f2a8932fa5a2   -H "Authorization: Bearer <TOKEN>"
+---
+
+## Decisions worth explaining
+
+**"Overdue" isn't stored, it's calculated.** Whether a loan is overdue depends on today's date, so storing it would mean running a nightly job to update rows, and the data would always be slightly stale. Instead, every query works it out on the spot (`status = 'pending' AND due_date < today`). It's always correct and there's nothing to keep in sync.
+
+**Dates follow Indian time.** "Today" is calculated in `Asia/Kolkata`, so a loan becomes overdue at midnight IST, not at midnight wherever the server happens to be.
+
+**Money never touches floating point.** Amounts are stored as `NUMERIC(12,2)` and summed inside Postgres. JavaScript's `0.1 + 0.2 = 0.30000000000000004` has no business near a ledger.
+
+**Repaying is a single atomic query.** `UPDATE ... WHERE id = $1 AND user_id = $2 AND status = 'pending' RETURNING *`. If two taps arrive at the same moment, only one can succeed. If nothing was updated, a follow-up check returns `409` (already repaid) or `404` (not yours or doesn't exist).
+
+**Login codes are hashed.** OTPs are stored as SHA-256 hashes and compared with `crypto.timingSafeEqual`, so a database leak doesn't hand out working codes and response timing gives nothing away.
+
+**Past due dates are allowed.** People often log a loan days after it happened, sometimes when it's already late. Blocking past dates would make the app less useful.
+
+**Reminders are drafted, never sent.** The app prepares the message and hands it to the system share sheet. You choose who gets it and whether it goes at all.
+
+---
+
+## Project structure
+
+```
+miniledger/
+├── backend/
+│   ├── src/
+│   │   ├── config/          # env validation (Zod), Postgres pool
+│   │   ├── db/migrations/   # plain SQL schema files
+│   │   ├── middleware/      # auth, validation, errors, uploads, rate limiting
+│   │   ├── modules/
+│   │   │   ├── auth/        # OTP request/verify, JWT
+│   │   │   ├── loans/       # create, list, repay, receipt, delete
+│   │   │   └── summary/     # totals in a single SQL query
+│   │   └── utils/
+│   └── tests/               # integration tests
+├── mobile/
+│   ├── App.tsx              # navigation + providers
+│   └── src/
+│       ├── api/             # axios client and endpoint helpers
+│       ├── components/      # SummaryCard, LoanItem, FilterTabs, Avatar, …
+│       ├── context/         # auth session, toasts
+│       ├── screens/         # Login, LoansList, AddLoan, LoanDetail
+│       ├── utils/           # dates, currency, reminders, image picking
+│       └── theme.ts         # colors, spacing, shadows
+└── docs/screenshots/
 ```
 
 ---
 
-## 📱 Mobile App Features
+## What I'd do next
 
-- **Dashboard**: balance card with outstanding amount, recovery progress bar, and lent / repaid / overdue totals; name search; filter tabs with live counts; skeleton loading and animated cards.
-- **Loan details**: tap any loan for a timeline (added → due → repaid), receipt preview or attach-later, mark repaid, and delete.
-- **Friendly reminders**: one tap opens the share sheet (WhatsApp, SMS, …) with a polite, pre-written message. The tone adapts to whether the loan is upcoming or overdue. Nothing is sent automatically.
-- **Fast entry**: quick-pick amounts and due dates, live "Save ₹1,800 to Rahul" button.
-- **Feedback**: toast confirmations for save, repay, delete and receipt upload.
+This is a project, not a product, so a few things are intentionally simple:
 
----
-
-## 💡 Design Decisions & Assumptions
-
-1. **Why "Overdue" is computed dynamically and NOT stored in a database column**:
-   - An overdue status depends on the passage of time: a loan that is not overdue at 11:59 PM becomes overdue at 12:00 AM.
-   - If stored as a column, you would need a daily cron job or trigger to update millions of rows, introducing state synchronization bugs.
-   - By computing it on the fly in SQL (`status = 'pending' AND due_date < (now() AT TIME ZONE 'Asia/Kolkata')::date`), it is **guaranteed to always be 100% accurate** with zero cron jobs.
-2. **Indian Standard Time (Asia/Kolkata)**:
-   - Due dates in Indian accounting expire at midnight IST. We enforce `(now() AT TIME ZONE 'Asia/Kolkata')::date` in PostgreSQL queries so overdue transitions happen precisely at Indian midnight regardless of the server's local hardware time or UTC offset.
-3. **Money Handling**:
-   - Stored in PostgreSQL as `NUMERIC(12, 2)` (arbitrary precision decimal).
-   - Aggregations (`SUM`, `FILTER`) happen strictly in PostgreSQL.
-   - Never use JavaScript floating-point arithmetic for financial sums (avoids `0.1 + 0.2 = 0.30000000000000004`).
-4. **Single Atomic Query for Repay**:
-   - Instead of a `SELECT` followed by an `UPDATE` (which can cause race conditions if two requests hit at the same millisecond), we use a single query:
-     `UPDATE loans SET status='repaid', repaid_at=now() WHERE id=$1 AND user_id=$2 AND status='pending' RETURNING *`
-   - If no row is returned, we check whether it was already repaid (409) or doesn't exist (404).
-5. **SHA-256 for OTPs with Constant-Time Comparison**:
-   - Storing plain-text OTPs is dangerous if database logs or snapshots leak. We hash the 6-digit code with SHA-256.
-   - We compare using `crypto.timingSafeEqual` to eliminate timing attack vectors.
-6. **Past Due Dates Allowed**:
-   - Users frequently lend money in cash and log it into their tracker days or weeks later. Disallowing past dates would prevent logging existing overdue debts.
-
----
-
-## 🔮 Known Limitations & Future Improvements
-
-If this were going to enterprise production:
-1. **Real SMS Gateway**: Replace the console mock with Twilio, AWS SNS, or Gupshup with webhook verification.
-2. **Refresh Tokens**: Implement short-lived access tokens (15 minutes) and rotating HTTP-only refresh tokens.
-3. **Cloud Storage (S3 / Cloud Storage)**: Store uploaded receipts in an encrypted S3 bucket using pre-signed upload URLs instead of the local filesystem.
-4. **Pagination**: Implement cursor-based pagination (`limit`, `cursor`) on `/api/loans` for users with thousands of entries.
-5. **Partial Repayments**: Support installment repayments and partial settlements instead of binary pending/repaid.
-6. **Multi-currency Support**: Allow tracking loans in USD/EUR with exchange rate snapshots.
+- **Real SMS.** Replace the console "SMS" with a provider like Twilio or MSG91.
+- **Better sessions.** Short-lived access tokens with refresh tokens, instead of one 7-day token.
+- **Cloud storage for receipts.** Use S3 with signed upload URLs instead of the server's disk.
+- **Partial repayments.** Let a friend pay back ₹1,000 of ₹2,500.
+- **Pagination.** Fine for a personal ledger today, but needed if the list grows into the thousands.
+- **Push notifications** on the due date, so you don't have to open the app to notice.
