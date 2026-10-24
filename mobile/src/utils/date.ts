@@ -41,3 +41,48 @@ export function formatFriendlyDate(isoDateString: string): string {
 
   return `${day} ${months[monthIndex]} ${year}`;
 }
+
+/**
+ * Parses a YYYY-MM-DD string as a local calendar date (midnight).
+ */
+function parseLocalDate(isoDateString: string): Date {
+  const [y, m, d] = isoDateString.split('-').map((p) => parseInt(p, 10));
+  return new Date(y, m - 1, d);
+}
+
+/**
+ * Whole days from today until the given YYYY-MM-DD date (negative if past).
+ */
+export function daysUntil(isoDateString: string): number {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const target = parseLocalDate(isoDateString);
+  return Math.round((target.getTime() - today.getTime()) / 86_400_000);
+}
+
+/**
+ * Human-friendly due text for a pending loan, e.g. "Due today", "Due in 3 days".
+ */
+export function describeDueIn(isoDateString: string): string {
+  const days = daysUntil(isoDateString);
+  if (days === 0) return 'Due today';
+  if (days === 1) return 'Due tomorrow';
+  if (days > 1 && days <= 30) return `Due in ${days} days`;
+  return `Due ${formatFriendlyDate(isoDateString)}`;
+}
+
+/**
+ * Adds `days` to a Date and returns a new Date (does not mutate input).
+ */
+export function addDays(date: Date, days: number): Date {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+/**
+ * Formats an ISO timestamp (e.g. repaidAt) as "12 Oct 2026".
+ */
+export function formatTimestamp(isoTimestamp: string): string {
+  return formatFriendlyDate(formatDateToISOString(new Date(isoTimestamp)));
+}

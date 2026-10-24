@@ -1,22 +1,33 @@
 import React from 'react';
 import {
-  TouchableOpacity,
+  Pressable,
   Text,
   ActivityIndicator,
   StyleSheet,
   ViewStyle,
   TextStyle,
+  StyleProp,
 } from 'react-native';
+import { colors, radius } from '../theme';
 
 interface PrimaryButtonProps {
   title: string;
   onPress: () => void;
   loading?: boolean;
   disabled?: boolean;
-  variant?: 'primary' | 'secondary' | 'danger';
-  style?: ViewStyle;
+  variant?: 'primary' | 'secondary' | 'danger' | 'success' | 'dark';
+  size?: 'md' | 'sm';
+  style?: StyleProp<ViewStyle>;
   textStyle?: TextStyle;
 }
+
+const VARIANTS = {
+  primary: { bg: colors.primary, fg: '#FFFFFF' },
+  secondary: { bg: colors.primarySoft, fg: colors.primaryText },
+  danger: { bg: colors.danger, fg: '#FFFFFF' },
+  success: { bg: colors.success, fg: '#FFFFFF' },
+  dark: { bg: colors.ink, fg: '#FFFFFF' },
+};
 
 export const PrimaryButton: React.FC<PrimaryButtonProps> = ({
   title,
@@ -24,59 +35,73 @@ export const PrimaryButton: React.FC<PrimaryButtonProps> = ({
   loading = false,
   disabled = false,
   variant = 'primary',
+  size = 'md',
   style,
   textStyle,
 }) => {
   const isActionDisabled = disabled || loading;
-
-  const getBackgroundColor = () => {
-    if (isActionDisabled) return '#94A3B8';
-    if (variant === 'secondary') return '#F1F5F9';
-    if (variant === 'danger') return '#EF4444';
-    return '#2563EB'; // Primary indigo/blue
-  };
-
-  const getTextColor = () => {
-    if (variant === 'secondary') return '#334155';
-    return '#FFFFFF';
-  };
+  const palette = VARIANTS[variant];
 
   return (
-    <TouchableOpacity
-      activeOpacity={0.8}
+    <Pressable
       onPress={onPress}
       disabled={isActionDisabled}
-      style={[
+      accessibilityRole="button"
+      accessibilityState={{ disabled: isActionDisabled, busy: loading }}
+      style={({ pressed }) => [
         styles.button,
-        { backgroundColor: getBackgroundColor() },
+        size === 'sm' && styles.small,
+        { backgroundColor: palette.bg },
+        isActionDisabled && !loading && styles.disabled,
+        pressed && styles.pressed,
         style,
       ]}
     >
       {loading ? (
-        <ActivityIndicator
-          size="small"
-          color={variant === 'secondary' ? '#334155' : '#FFFFFF'}
-        />
+        <ActivityIndicator size="small" color={palette.fg} />
       ) : (
-        <Text style={[styles.text, { color: getTextColor() }, textStyle]}>
+        <Text
+          style={[
+            styles.text,
+            size === 'sm' && styles.smallText,
+            { color: palette.fg },
+            textStyle,
+          ]}
+        >
           {title}
         </Text>
       )}
-    </TouchableOpacity>
+    </Pressable>
   );
 };
 
 const styles = StyleSheet.create({
   button: {
-    height: 48,
-    borderRadius: 8,
+    height: 52,
+    borderRadius: radius.md,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     flexDirection: 'row',
+  },
+  small: {
+    height: 36,
+    paddingHorizontal: 14,
+    borderRadius: radius.sm,
+  },
+  disabled: {
+    opacity: 0.45,
+  },
+  pressed: {
+    opacity: 0.85,
+    transform: [{ scale: 0.98 }],
   },
   text: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
+    letterSpacing: 0.2,
+  },
+  smallText: {
+    fontSize: 13,
   },
 });

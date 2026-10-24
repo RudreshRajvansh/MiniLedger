@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,21 +7,28 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  TouchableOpacity,
+  Pressable,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import { requestOtp, verifyOtp } from '../api/auth.api';
 import { getErrorMessage } from '../api/client';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { ErrorBanner } from '../components/ErrorBanner';
+import { colors, radius, shadow, spacing } from '../theme';
+
+const OTP_LENGTH = 6;
 
 export const LoginScreen: React.FC = () => {
   const { login } = useAuth();
+  const insets = useSafeAreaInsets();
+  const otpInputRef = useRef<TextInput>(null);
 
   // Step 1: 'phone' | Step 2: 'otp'
   const [step, setStep] = useState<'phone' | 'otp'>('phone');
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
+  const [otpFocused, setOtpFocused] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -30,7 +37,7 @@ export const LoginScreen: React.FC = () => {
   const [canResend, setCanResend] = useState(false);
 
   useEffect(() => {
-    let timer: NodeJS.Timeout;
+    let timer: ReturnType<typeof setTimeout>;
     if (step === 'otp' && countdown > 0) {
       timer = setTimeout(() => setCountdown((c) => c - 1), 1000);
     } else if (countdown === 0) {
@@ -61,11 +68,11 @@ export const LoginScreen: React.FC = () => {
     }
   };
 
-  const handleVerifyOtp = async () => {
+  const handleVerifyOtp = async (code: string = otp) => {
     setErrorMessage(null);
-    const cleanedOtp = otp.trim();
+    const cleanedOtp = code.trim();
 
-    if (cleanedOtp.length !== 6) {
+    if (cleanedOtp.length !== OTP_LENGTH) {
       setErrorMessage('Please enter the full 6-digit OTP');
       return;
     }
@@ -76,8 +83,16 @@ export const LoginScreen: React.FC = () => {
       await login(data.token, data.user);
     } catch (err) {
       setErrorMessage(getErrorMessage(err));
-    } finally {
       setLoading(false);
+    }
+  };
+
+  const handleOtpChange = (val: string) => {
+    const digits = val.replace(/\D/g, '').slice(0, OTP_LENGTH);
+    setOtp(digits);
+    // Auto-submit once all six digits are in
+    if (digits.length === OTP_LENGTH && !loading) {
+      handleVerifyOtp(digits);
     }
   };
 
@@ -87,6 +102,7 @@ export const LoginScreen: React.FC = () => {
     setLoading(true);
     try {
       await requestOtp(phone.trim());
+      setOtp('');
       setCountdown(30);
       setCanResend(false);
     } catch (err) {
@@ -104,44 +120,68 @@ export const LoginScreen: React.FC = () => {
 
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={styles.container}
     >
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
+        bounces={false}
       >
-        <View style={styles.card}>
-          <Text style={styles.logo}>📒 MiniLedger</Text>
-          <Text style={styles.subtitle}>
-            Track money lent to friends with zero hassle
+        {/* Brand hero */}
+        <View style={[styles.hero, { paddingTop: insets.top + 48 }]}>
+          <View style={[styles.ring, styles.ringA]} />
+          <View style={[styles.ring, styles.ringB]} />
+
+          <View style={styles.logoMark}>
+            <Text style={styles.logoMarkText}>₹</Text>
+          </View>
+          <Text style={styles.brand}>MiniLedger</Text>
+          <Text style={styles.tagline}>
+            Lend to friends.{'\n'}Never lose track of it.
           </Text>
 
-          <ErrorBanner
-            message={errorMessage}
-            onDismiss={() => setErrorMessage(null)}
-          />
+          <View style={styles.features}>
+            <Feature icon="⏰" text="Overdue alerts" />
+            <Feature icon="🧾" text="Photo receipts" />
+            <Feature icon="🔒" text="OTP login" />
+          </View>
+        </View>
 
+        {/* Auth sheet */}
+        <View style={[styles.sheet, { paddingBottom: insets.bottom + spacing.xxl }]}>
           {step === 'phone' ? (
             /* STEP 1: PHONE INPUT */
-            <View style={styles.stepContainer}>
-              <Text style={styles.label}>Mobile Phone Number</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="e.g. 9876543210 or +91..."
-                keyboardType="phone-pad"
-                value={phone}
-                onChangeText={setPhone}
-                editable={!loading}
-                autoFocus
-              />
-
-              <Text style={styles.helperText}>
-                Accepts 10-digit Indian numbers (with or without +91)
+            <View>
+              <Text style={styles.sheetTitle}>Sign in</Text>
+              <Text style={styles.sheetSubtitle}>
+                We’ll text a one-time code to your mobile number.
               </Text>
 
+              <ErrorBanner message={errorMessage} onDismiss={() => setErrorMessage(null)} />
+
+              <Text style={styles.label}>Mobile number</Text>
+              <View style={styles.phoneField}>
+                <View style={styles.prefix}>
+                  <Text style={styles.prefixText}>+91</Text>
+                </View>
+                <TextInput
+                  style={styles.phoneInput}
+                  placeholder="98765 43210"
+                  placeholderTextColor={colors.textFaint}
+                  keyboardType="phone-pad"
+                  value={phone}
+                  onChangeText={setPhone}
+                  editable={!loading}
+                  onSubmitEditing={handleSendOtp}
+                  returnKeyType="send"
+                  maxLength={14}
+                  autoFocus
+                />
+              </View>
+
               <PrimaryButton
-                title="Send OTP"
+                title="Send code"
                 onPress={handleSendOtp}
                 loading={loading}
                 style={styles.submitBtn}
@@ -149,49 +189,77 @@ export const LoginScreen: React.FC = () => {
             </View>
           ) : (
             /* STEP 2: OTP VERIFICATION */
-            <View style={styles.stepContainer}>
-              <View style={styles.phoneReviewRow}>
-                <Text style={styles.sendingToText}>
-                  OTP sent to <Text style={styles.phoneHighlight}>{phone}</Text>
+            <View>
+              <Text style={styles.sheetTitle}>Enter code</Text>
+              <View style={styles.sentRow}>
+                <Text style={styles.sheetSubtitleInline}>
+                  Sent to <Text style={styles.phoneHighlight}>{phone}</Text>
                 </Text>
-                <TouchableOpacity onPress={handleChangeNumber} disabled={loading}>
-                  <Text style={styles.changePhoneText}>Change</Text>
-                </TouchableOpacity>
+                <Pressable onPress={handleChangeNumber} disabled={loading} hitSlop={8}>
+                  <Text style={styles.link}>Edit</Text>
+                </Pressable>
               </View>
 
-              <Text style={styles.label}>Enter 6-Digit OTP</Text>
-              <TextInput
-                style={[styles.input, styles.otpInput]}
-                placeholder="• • • • • •"
-                keyboardType="number-pad"
-                maxLength={6}
-                value={otp}
-                onChangeText={setOtp}
-                editable={!loading}
-                autoFocus
-              />
+              <ErrorBanner message={errorMessage} onDismiss={() => setErrorMessage(null)} />
+
+              {/* Six visual cells driven by one hidden input */}
+              <Pressable style={styles.otpRow} onPress={() => otpInputRef.current?.focus()}>
+                {Array.from({ length: OTP_LENGTH }).map((_, i) => {
+                  const char = otp[i] ?? '';
+                  const isActive = otpFocused && i === Math.min(otp.length, OTP_LENGTH - 1);
+                  return (
+                    <View
+                      key={i}
+                      style={[
+                        styles.otpCell,
+                        char !== '' && styles.otpCellFilled,
+                        isActive && styles.otpCellActive,
+                      ]}
+                    >
+                      <Text style={styles.otpChar}>{char}</Text>
+                    </View>
+                  );
+                })}
+                <TextInput
+                  ref={otpInputRef}
+                  value={otp}
+                  onChangeText={handleOtpChange}
+                  onFocus={() => setOtpFocused(true)}
+                  onBlur={() => setOtpFocused(false)}
+                  keyboardType="number-pad"
+                  textContentType="oneTimeCode"
+                  autoComplete="sms-otp"
+                  maxLength={OTP_LENGTH}
+                  editable={!loading}
+                  autoFocus
+                  style={styles.hiddenInput}
+                  caretHidden
+                />
+              </Pressable>
 
               <View style={styles.devHintBox}>
+                <Text style={styles.devHintTitle}>Dev mode</Text>
                 <Text style={styles.devHintText}>
-                  💡 Dev Mode: Look at your backend terminal console to find your OTP code.
+                  The code is printed in the backend terminal as [MOCK OTP].
                 </Text>
               </View>
 
               <PrimaryButton
-                title="Verify & Log In"
-                onPress={handleVerifyOtp}
+                title="Verify & continue"
+                onPress={() => handleVerifyOtp()}
                 loading={loading}
+                disabled={otp.length !== OTP_LENGTH}
                 style={styles.submitBtn}
               />
 
               <View style={styles.resendRow}>
                 {canResend ? (
-                  <TouchableOpacity onPress={handleResendOtp} disabled={loading}>
-                    <Text style={styles.resendLink}>Resend OTP</Text>
-                  </TouchableOpacity>
+                  <Pressable onPress={handleResendOtp} disabled={loading}>
+                    <Text style={styles.link}>Resend code</Text>
+                  </Pressable>
                 ) : (
                   <Text style={styles.countdownText}>
-                    Resend OTP in {countdown}s
+                    Resend code in 0:{String(countdown).padStart(2, '0')}
                   </Text>
                 )}
               </View>
@@ -203,117 +271,245 @@ export const LoginScreen: React.FC = () => {
   );
 };
 
+const Feature: React.FC<{ icon: string; text: string }> = ({ icon, text }) => (
+  <View style={styles.feature}>
+    <Text style={styles.featureIcon}>{icon}</Text>
+    <Text style={styles.featureText}>{text}</Text>
+  </View>
+);
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.ink,
   },
   scrollContent: {
     flexGrow: 1,
-    justifyContent: 'center',
-    padding: 20,
   },
-  card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 24,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 4,
+  hero: {
+    paddingHorizontal: spacing.xxl,
+    paddingBottom: 56,
+    overflow: 'hidden',
   },
-  logo: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#1E293B',
-    textAlign: 'center',
-    marginBottom: 6,
+  ring: {
+    position: 'absolute',
+    borderRadius: 999,
   },
-  subtitle: {
-    fontSize: 14,
-    color: '#64748B',
-    textAlign: 'center',
-    marginBottom: 20,
+  ringA: {
+    width: 340,
+    height: 340,
+    top: -160,
+    right: -140,
+    backgroundColor: 'rgba(79, 70, 229, 0.35)',
   },
-  stepContainer: {
-    marginTop: 8,
+  ringB: {
+    width: 180,
+    height: 180,
+    top: 120,
+    right: -60,
+    backgroundColor: 'rgba(52, 211, 153, 0.12)',
   },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#334155',
-    marginBottom: 6,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#CBD5E1',
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 16,
-    color: '#0F172A',
-    backgroundColor: '#FFFFFF',
-  },
-  otpInput: {
-    letterSpacing: 8,
-    textAlign: 'center',
-    fontSize: 22,
-    fontWeight: '700',
-  },
-  helperText: {
-    fontSize: 12,
-    color: '#94A3B8',
-    marginTop: 6,
-    marginBottom: 16,
-  },
-  phoneReviewRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  logoMark: {
+    width: 52,
+    height: 52,
+    borderRadius: radius.lg,
+    backgroundColor: colors.primary,
     alignItems: 'center',
-    marginBottom: 16,
+    justifyContent: 'center',
+    marginBottom: spacing.xl,
   },
-  sendingToText: {
+  logoMarkText: {
+    color: '#FFFFFF',
+    fontSize: 26,
+    fontWeight: '800',
+  },
+  brand: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 15,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    marginBottom: spacing.sm,
+  },
+  tagline: {
+    color: '#FFFFFF',
+    fontSize: 32,
+    lineHeight: 38,
+    fontWeight: '800',
+    letterSpacing: -0.8,
+  },
+  features: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: spacing.xl,
+  },
+  feature: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: radius.pill,
+  },
+  featureIcon: {
+    fontSize: 12,
+    marginRight: 6,
+  },
+  featureText: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  sheet: {
+    flex: 1,
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    marginTop: -24,
+    paddingHorizontal: spacing.xxl,
+    paddingTop: spacing.xxl,
+    ...shadow(3),
+  },
+  sheetTitle: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: colors.text,
+    letterSpacing: -0.4,
+  },
+  sheetSubtitle: {
     fontSize: 14,
-    color: '#475569',
+    color: colors.textMuted,
+    marginTop: 6,
+    marginBottom: spacing.xl,
+    lineHeight: 20,
+  },
+  sentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 6,
+    marginBottom: spacing.xl,
+  },
+  sheetSubtitleInline: {
+    fontSize: 14,
+    color: colors.textMuted,
   },
   phoneHighlight: {
     fontWeight: '700',
-    color: '#0F172A',
+    color: colors.text,
   },
-  changePhoneText: {
-    color: '#2563EB',
-    fontWeight: '600',
+  label: {
     fontSize: 13,
+    fontWeight: '700',
+    color: colors.text,
+    marginBottom: spacing.sm,
+  },
+  phoneField: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: colors.borderStrong,
+    borderRadius: radius.md,
+    height: 56,
+    overflow: 'hidden',
+  },
+  prefix: {
+    height: '100%',
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+    backgroundColor: colors.surfaceMuted,
+    borderRightWidth: 1,
+    borderRightColor: colors.border,
+  },
+  prefixText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  phoneInput: {
+    flex: 1,
+    minWidth: 0,
+    height: '100%',
+    paddingHorizontal: 14,
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.text,
+    letterSpacing: 0.5,
+  },
+  otpRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 8,
+    marginTop: spacing.sm,
+  },
+  otpCell: {
+    flex: 1,
+    height: 58,
+    maxWidth: 54,
+    borderRadius: radius.md,
+    borderWidth: 1.5,
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  otpCellFilled: {
+    borderColor: colors.text,
+    backgroundColor: colors.surfaceMuted,
+  },
+  otpCellActive: {
+    borderColor: colors.primary,
+    borderWidth: 2,
+  },
+  otpChar: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: colors.text,
+  },
+  hiddenInput: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    opacity: 0,
   },
   devHintBox: {
-    backgroundColor: '#EFF6FF',
-    borderRadius: 8,
-    padding: 12,
-    marginTop: 14,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#BFDBFE',
+    backgroundColor: colors.primarySoft,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginTop: spacing.xl,
+  },
+  devHintTitle: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: colors.primary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: 2,
   },
   devHintText: {
     fontSize: 13,
-    color: '#1E40AF',
+    color: colors.primaryText,
     lineHeight: 18,
   },
   submitBtn: {
-    marginTop: 8,
+    marginTop: spacing.xl,
   },
   resendRow: {
-    marginTop: 16,
+    marginTop: spacing.xl,
     alignItems: 'center',
   },
-  resendLink: {
-    color: '#2563EB',
-    fontWeight: '600',
+  link: {
+    color: colors.primary,
+    fontWeight: '700',
     fontSize: 14,
   },
   countdownText: {
-    color: '#94A3B8',
+    color: colors.textFaint,
     fontSize: 14,
+    fontWeight: '500',
   },
 });

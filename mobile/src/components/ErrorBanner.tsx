@@ -1,32 +1,37 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ViewStyle, StyleProp } from 'react-native';
+import { colors, radius, spacing } from '../theme';
 
 interface ErrorBannerProps {
   message: string | null;
   onDismiss?: () => void;
   onRetry?: () => void;
+  style?: StyleProp<ViewStyle>;
 }
 
 export const ErrorBanner: React.FC<ErrorBannerProps> = ({
   message,
   onDismiss,
   onRetry,
+  style,
 }) => {
   if (!message) return null;
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.icon}>⚠️</Text>
+    <View style={[styles.container, style]} accessibilityRole="alert">
+      <View style={styles.iconCircle}>
+        <Text style={styles.icon}>!</Text>
+      </View>
       <Text style={styles.message}>{message}</Text>
       {onRetry && (
-        <TouchableOpacity onPress={onRetry} style={styles.retryButton}>
+        <Pressable onPress={onRetry} style={styles.retryButton}>
           <Text style={styles.retryText}>Retry</Text>
-        </TouchableOpacity>
+        </Pressable>
       )}
       {onDismiss && (
-        <TouchableOpacity onPress={onDismiss} style={styles.dismissButton}>
+        <Pressable onPress={onDismiss} style={styles.dismissButton} hitSlop={8}>
           <Text style={styles.dismissText}>✕</Text>
-        </TouchableOpacity>
+        </Pressable>
       )}
     </View>
   );
@@ -34,44 +39,56 @@ export const ErrorBanner: React.FC<ErrorBannerProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#FEF2F2',
+    backgroundColor: colors.dangerSoft,
     borderWidth: 1,
-    borderColor: '#FCA5A5',
-    borderRadius: 8,
-    padding: 12,
-    marginVertical: 8,
+    borderColor: colors.dangerBorder,
+    borderRadius: radius.md,
+    paddingVertical: 10,
+    paddingHorizontal: spacing.md,
+    marginVertical: spacing.sm,
     flexDirection: 'row',
     alignItems: 'center',
   },
+  iconCircle: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: colors.danger,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
   icon: {
-    marginRight: 8,
-    fontSize: 16,
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '800',
   },
   message: {
     flex: 1,
-    color: '#991B1B',
-    fontSize: 14,
+    color: '#9F1239',
+    fontSize: 13,
     lineHeight: 18,
+    fontWeight: '500',
   },
   retryButton: {
-    marginLeft: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    backgroundColor: '#EF4444',
-    borderRadius: 4,
+    marginLeft: spacing.sm,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    backgroundColor: colors.danger,
+    borderRadius: 6,
   },
   retryText: {
     color: '#FFFFFF',
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   dismissButton: {
-    marginLeft: 8,
+    marginLeft: spacing.sm,
     padding: 4,
   },
   dismissText: {
-    color: '#991B1B',
-    fontSize: 14,
-    fontWeight: 'bold',
+    color: '#9F1239',
+    fontSize: 13,
+    fontWeight: '700',
   },
 });

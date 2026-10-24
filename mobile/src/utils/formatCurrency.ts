@@ -1,23 +1,28 @@
 /**
  * Formats a numeric amount in Indian Rupees (INR) with standard en-IN numbering grouping.
+ * Whole amounts drop the paise, fractional amounts keep two decimals.
  * e.g., 12500 -> ₹12,500
  * e.g., 1500000 -> ₹15,00,000
+ * e.g., 99.5 -> ₹99.50
  */
 export function formatCurrency(amount: number): string {
-  if (isNaN(amount) || amount === null || amount === undefined) {
+  if (amount === null || amount === undefined || isNaN(amount)) {
     return '₹0';
   }
+
+  const fractionDigits = Number.isInteger(amount) ? 0 : 2;
 
   try {
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
       currency: 'INR',
-      maximumFractionDigits: 2,
+      minimumFractionDigits: fractionDigits,
+      maximumFractionDigits: fractionDigits,
     }).format(amount);
   } catch {
     // Fallback if Intl.NumberFormat is unavailable in older engines
     const parts = amount.toFixed(2).split('.');
-    let integerPart = parts[0];
+    const integerPart = parts[0];
     const decimalPart = parts[1] === '00' ? '' : `.${parts[1]}`;
 
     const lastThree = integerPart.substring(integerPart.length - 3);

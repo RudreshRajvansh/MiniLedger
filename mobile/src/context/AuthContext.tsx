@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import * as SecureStore from 'expo-secure-store';
+import * as storage from '../utils/storage';
 import { setAuthToken, setOnUnauthorized } from '../api/client';
 
 export interface User {
@@ -33,12 +33,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // Restore persisted session from SecureStore on app launch
+  // Restore persisted session from storage on app launch
   useEffect(() => {
     async function restoreSession() {
       try {
-        const storedToken = await SecureStore.getItemAsync(TOKEN_KEY);
-        const storedUser = await SecureStore.getItemAsync(USER_KEY);
+        const storedToken = await storage.getItem(TOKEN_KEY);
+        const storedUser = await storage.getItem(USER_KEY);
 
         if (storedToken && storedUser) {
           setToken(storedToken);
@@ -46,7 +46,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
           setAuthToken(storedToken);
         }
       } catch (err) {
-        console.error('Failed to restore session from SecureStore:', err);
+        console.error('Failed to restore session from storage:', err);
       } finally {
         setIsLoading(false);
       }
@@ -68,8 +68,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     setAuthToken(newToken);
 
     try {
-      await SecureStore.setItemAsync(TOKEN_KEY, newToken);
-      await SecureStore.setItemAsync(USER_KEY, JSON.stringify(newUser));
+      await storage.setItem(TOKEN_KEY, newToken);
+      await storage.setItem(USER_KEY, JSON.stringify(newUser));
     } catch (err) {
       console.error('Failed to persist credentials:', err);
     }
@@ -81,8 +81,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     setAuthToken(null);
 
     try {
-      await SecureStore.deleteItemAsync(TOKEN_KEY);
-      await SecureStore.deleteItemAsync(USER_KEY);
+      await storage.deleteItem(TOKEN_KEY);
+      await storage.deleteItem(USER_KEY);
     } catch (err) {
       console.error('Failed to clear credentials:', err);
     }

@@ -2,144 +2,204 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Summary } from '../api/loans.api';
 import { formatCurrency } from '../utils/formatCurrency';
+import { colors, radius, shadow, spacing } from '../theme';
 
 interface SummaryCardProps {
   summary: Summary | null;
-  loading?: boolean;
 }
 
+/**
+ * Dark "balance card" hero: outstanding amount up top, a recovery progress
+ * bar, and the three supporting totals underneath.
+ */
 export const SummaryCard: React.FC<SummaryCardProps> = ({ summary }) => {
   const totalLent = summary?.totalLent ?? 0;
   const totalRepaid = summary?.totalRepaid ?? 0;
   const totalPending = summary?.totalPending ?? 0;
   const overdueAmount = summary?.overdueAmount ?? 0;
+  const pendingCount = summary?.counts?.pending ?? 0;
   const overdueCount = summary?.counts?.overdue ?? 0;
+
+  const recoveredPct = totalLent > 0 ? Math.round((totalRepaid / totalLent) * 100) : 0;
 
   return (
     <View style={styles.card}>
-      <Text style={styles.headerTitle}>Financial Overview</Text>
+      {/* Decorative background rings */}
+      <View style={[styles.ring, styles.ringLarge]} />
+      <View style={[styles.ring, styles.ringSmall]} />
 
-      <View style={styles.grid}>
-        {/* Total Lent */}
-        <View style={styles.metricItem}>
-          <Text style={styles.metricLabel}>Total Lent</Text>
-          <Text style={styles.metricValue}>{formatCurrency(totalLent)}</Text>
-        </View>
+      <Text style={styles.eyebrow}>Outstanding with friends</Text>
+      <Text style={styles.heroAmount} numberOfLines={1} adjustsFontSizeToFit>
+        {formatCurrency(totalPending)}
+      </Text>
+      <Text style={styles.heroCaption}>
+        across {pendingCount} open {pendingCount === 1 ? 'loan' : 'loans'}
+      </Text>
 
-        {/* Total Repaid */}
-        <View style={styles.metricItem}>
-          <Text style={styles.metricLabel}>Total Repaid</Text>
-          <Text style={[styles.metricValue, styles.repaidValue]}>
-            {formatCurrency(totalRepaid)}
-          </Text>
+      {/* Recovery progress */}
+      <View style={styles.progressBlock}>
+        <View style={styles.progressLabels}>
+          <Text style={styles.progressLabel}>Recovered</Text>
+          <Text style={styles.progressValue}>{recoveredPct}%</Text>
         </View>
+        <View style={styles.track}>
+          <View style={[styles.fill, { width: `${recoveredPct}%` }]} />
+        </View>
+      </View>
 
-        {/* Pending */}
-        <View style={styles.metricItem}>
-          <Text style={styles.metricLabel}>Pending</Text>
-          <Text style={[styles.metricValue, styles.pendingValue]}>
-            {formatCurrency(totalPending)}
-          </Text>
-        </View>
-
-        {/* Overdue (Highlighted in red) */}
-        <View style={[styles.metricItem, styles.overdueBox]}>
-          <View style={styles.overdueHeader}>
-            <Text style={[styles.metricLabel, styles.overdueLabel]}>
-              Overdue
-            </Text>
-            {overdueCount > 0 && (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>{overdueCount}</Text>
-              </View>
-            )}
-          </View>
-          <Text style={[styles.metricValue, styles.overdueValue]}>
-            {formatCurrency(overdueAmount)}
-          </Text>
-        </View>
+      <View style={styles.statsRow}>
+        <Stat label="Total lent" value={formatCurrency(totalLent)} />
+        <View style={styles.divider} />
+        <Stat label="Repaid" value={formatCurrency(totalRepaid)} tone="success" />
+        <View style={styles.divider} />
+        <Stat
+          label={overdueCount > 0 ? `Overdue · ${overdueCount}` : 'Overdue'}
+          value={formatCurrency(overdueAmount)}
+          tone={overdueAmount > 0 ? 'danger' : undefined}
+        />
       </View>
     </View>
   );
 };
 
+const Stat: React.FC<{ label: string; value: string; tone?: 'success' | 'danger' }> = ({
+  label,
+  value,
+  tone,
+}) => (
+  <View style={styles.stat}>
+    <View style={styles.statLabelRow}>
+      {tone && (
+        <View
+          style={[
+            styles.dot,
+            { backgroundColor: tone === 'success' ? '#34D399' : '#FB7185' },
+          ]}
+        />
+      )}
+      <Text style={styles.statLabel} numberOfLines={1}>
+        {label}
+      </Text>
+    </View>
+    <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>
+      {value}
+    </Text>
+  </View>
+);
+
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    marginHorizontal: 16,
-    marginTop: 12,
-    marginBottom: 8,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 3,
+    backgroundColor: colors.ink,
+    borderRadius: radius.xl,
+    padding: spacing.xl,
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.sm,
+    overflow: 'hidden',
+    ...shadow(3),
   },
-  headerTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#64748B',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 12,
-  },
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  metricItem: {
-    width: '48%',
-    backgroundColor: '#F8FAFC',
-    borderRadius: 8,
-    padding: 12,
-  },
-  metricLabel: {
-    fontSize: 12,
-    color: '#64748B',
-    marginBottom: 4,
-  },
-  metricValue: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#0F172A',
-  },
-  repaidValue: {
-    color: '#16A34A', // Green
-  },
-  pendingValue: {
-    color: '#2563EB', // Blue
-  },
-  overdueBox: {
-    backgroundColor: '#FEF2F2',
-    borderColor: '#FECACA',
+  ring: {
+    position: 'absolute',
+    borderRadius: 999,
     borderWidth: 1,
+    borderColor: 'rgba(129, 140, 248, 0.25)',
   },
-  overdueHeader: {
+  ringLarge: {
+    width: 260,
+    height: 260,
+    top: -120,
+    right: -90,
+    backgroundColor: 'rgba(79, 70, 229, 0.22)',
+  },
+  ringSmall: {
+    width: 140,
+    height: 140,
+    top: -30,
+    right: -40,
+    backgroundColor: 'rgba(129, 140, 248, 0.16)',
+  },
+  eyebrow: {
+    color: colors.textOnDarkMuted,
+    fontSize: 13,
+    fontWeight: '600',
+    letterSpacing: 0.3,
+  },
+  heroAmount: {
+    color: colors.textOnDark,
+    fontSize: 38,
+    fontWeight: '800',
+    letterSpacing: -1,
+    marginTop: 6,
+    fontVariant: ['tabular-nums'],
+  },
+  heroCaption: {
+    color: colors.textOnDarkMuted,
+    fontSize: 13,
+    marginTop: 2,
+  },
+  progressBlock: {
+    marginTop: spacing.xl,
+  },
+  progressLabels: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  progressLabel: {
+    color: colors.textOnDarkMuted,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  progressValue: {
+    color: colors.textOnDark,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  track: {
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    overflow: 'hidden',
+  },
+  fill: {
+    height: '100%',
+    borderRadius: 4,
+    backgroundColor: '#34D399',
+  },
+  statsRow: {
+    flexDirection: 'row',
+    marginTop: spacing.xl,
+    paddingTop: spacing.lg,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.1)',
+  },
+  stat: {
+    flex: 1,
+  },
+  divider: {
+    width: 1,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    marginHorizontal: spacing.md,
+  },
+  statLabelRow: {
+    flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 4,
   },
-  overdueLabel: {
-    color: '#DC2626',
+  dot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 6,
+  },
+  statLabel: {
+    color: colors.textOnDarkMuted,
+    fontSize: 11,
     fontWeight: '600',
   },
-  overdueValue: {
-    color: '#DC2626', // Red
-  },
-  badge: {
-    backgroundColor: '#EF4444',
-    borderRadius: 10,
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-  },
-  badgeText: {
-    color: '#FFFFFF',
-    fontSize: 10,
-    fontWeight: 'bold',
+  statValue: {
+    color: colors.textOnDark,
+    fontSize: 15,
+    fontWeight: '700',
+    fontVariant: ['tabular-nums'],
   },
 });

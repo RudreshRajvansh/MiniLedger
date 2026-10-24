@@ -1,15 +1,11 @@
 import React from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Image,
-  Alert,
-} from 'react-native';
+import { View, Text, StyleSheet, Pressable, Image } from 'react-native';
 import { Loan } from '../api/loans.api';
 import { formatCurrency } from '../utils/formatCurrency';
-import { formatFriendlyDate } from '../utils/date';
+import { describeDueIn, formatTimestamp } from '../utils/date';
+import { confirmAction } from '../utils/confirm';
+import { Avatar } from './Avatar';
+import { colors, radius, shadow, spacing } from '../theme';
 
 interface LoanItemProps {
   loan: Loan;
@@ -28,260 +24,219 @@ export const LoanItem: React.FC<LoanItemProps> = ({
   const isOverdue = loan.isOverdue;
 
   const handleRepayPress = () => {
-    Alert.alert(
-      'Mark as Repaid',
+    confirmAction(
+      'Mark as repaid',
       `Confirm that ${loan.friendName} has repaid ${formatCurrency(loan.amount)}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Confirm Repayment',
-          style: 'default',
-          onPress: () => onRepay(loan.id),
-        },
-      ],
+      'Confirm',
+      () => onRepay(loan.id),
     );
   };
 
+  const status = isRepaid
+    ? { label: 'Repaid', fg: colors.success, bg: colors.successSoft }
+    : isOverdue
+      ? { label: 'Overdue', fg: colors.danger, bg: colors.dangerSoft }
+      : { label: 'Pending', fg: colors.warning, bg: colors.warningSoft };
+
+  const subline = isRepaid
+    ? loan.repaidAt
+      ? `Repaid on ${formatTimestamp(loan.repaidAt)}`
+      : 'Repaid'
+    : isOverdue
+      ? `Overdue by ${loan.daysOverdue} ${loan.daysOverdue === 1 ? 'day' : 'days'}`
+      : describeDueIn(loan.dueDate);
+
   return (
-    <View
-      style={[
-        styles.card,
-        isOverdue && styles.overdueCard,
-        isRepaid && styles.repaidCard,
-      ]}
-    >
-      {/* Top Header: Friend Name & Amount */}
-      <View style={styles.topRow}>
-        <View style={styles.nameContainer}>
-          <Text style={[styles.friendName, isRepaid && styles.mutedText]}>
+    <View style={[styles.card, isOverdue && styles.overdueCard]}>
+      {isOverdue && <View style={styles.overdueStripe} />}
+
+      <View style={styles.row}>
+        <Avatar name={loan.friendName} />
+
+        <View style={styles.body}>
+          <Text style={styles.friendName} numberOfLines={1}>
             {loan.friendName}
           </Text>
-          <Text style={styles.dateLabel}>
-            Due: {formatFriendlyDate(loan.dueDate)}
+          <Text
+            style={[
+              styles.subline,
+              isOverdue && { color: colors.danger, fontWeight: '600' },
+            ]}
+            numberOfLines={1}
+          >
+            {subline}
           </Text>
         </View>
 
-        <Text
-          style={[
-            styles.amount,
-            isOverdue && styles.overdueText,
-            isRepaid && styles.repaidAmount,
-          ]}
-        >
-          {formatCurrency(loan.amount)}
-        </Text>
+        <View style={styles.amountCol}>
+          <Text
+            style={[
+              styles.amount,
+              isRepaid && styles.repaidAmount,
+              isOverdue && { color: colors.danger },
+            ]}
+          >
+            {formatCurrency(loan.amount)}
+          </Text>
+          <View style={[styles.pill, { backgroundColor: status.bg }]}>
+            <View style={[styles.pillDot, { backgroundColor: status.fg }]} />
+            <Text style={[styles.pillText, { color: status.fg }]}>{status.label}</Text>
+          </View>
+        </View>
       </View>
 
-      {/* Overdue Warning Banner */}
-      {isOverdue && (
-        <View style={styles.overdueBanner}>
-          <Text style={styles.overdueBannerText}>
-            ⚠️ Overdue by {loan.daysOverdue} {loan.daysOverdue === 1 ? 'day' : 'days'}
-          </Text>
+      {(!isRepaid || loan.receiptUrl) && (
+        <View style={styles.footer}>
+          {loan.receiptUrl ? (
+            <Pressable
+              onPress={() => onOpenReceipt(loan.receiptUrl!)}
+              style={({ pressed }) => [styles.receiptChip, pressed && { opacity: 0.7 }]}
+            >
+              <Image source={{ uri: loan.receiptUrl }} style={styles.receiptThumb} />
+              <Text style={styles.receiptLabel}>View receipt</Text>
+            </Pressable>
+          ) : (
+            <Text style={styles.footerHint}>Lent on {formatTimestamp(loan.createdAt)}</Text>
+          )}
+
+          {!isRepaid && (
+            <Pressable
+              onPress={handleRepayPress}
+              disabled={isRepaying}
+              style={({ pressed }) => [
+                styles.repayButton,
+                (pressed || isRepaying) && { opacity: 0.7 },
+              ]}
+            >
+              <Text style={styles.repayButtonText}>
+                {isRepaying ? 'Updating…' : '✓  Mark repaid'}
+              </Text>
+            </Pressable>
+          )}
         </View>
       )}
-
-      {/* Bottom Footer: Badges, Receipt Thumbnail, Repay Action */}
-      <View style={styles.bottomRow}>
-        <View style={styles.badgeGroup}>
-          {isRepaid ? (
-            <View style={styles.repaidBadge}>
-              <Text style={styles.repaidBadgeText}>✓ Repaid</Text>
-            </View>
-          ) : isOverdue ? (
-            <View style={styles.overdueBadge}>
-              <Text style={styles.overdueBadgeText}>Overdue</Text>
-            </View>
-          ) : (
-            <View style={styles.pendingBadge}>
-              <Text style={styles.pendingBadgeText}>Pending</Text>
-            </View>
-          )}
-
-          {/* Receipt thumbnail button */}
-          {loan.receiptUrl && (
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() => onOpenReceipt(loan.receiptUrl!)}
-              style={styles.receiptButton}
-            >
-              <Image
-                source={{ uri: loan.receiptUrl }}
-                style={styles.receiptThumb}
-              />
-              <Text style={styles.receiptLabel}>Receipt</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {/* Repay button on pending items */}
-        {!isRepaid && (
-          <TouchableOpacity
-            style={[styles.repayButton, isRepaying && styles.disabledButton]}
-            onPress={handleRepayPress}
-            disabled={isRepaying}
-          >
-            <Text style={styles.repayButtonText}>
-              {isRepaying ? 'Updating...' : 'Mark Repaid'}
-            </Text>
-          </TouchableOpacity>
-        )}
-      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 10,
-    padding: 16,
-    marginHorizontal: 16,
-    marginVertical: 6,
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.md,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    borderColor: colors.border,
+    overflow: 'hidden',
+    ...shadow(1),
   },
   overdueCard: {
-    backgroundColor: '#FFF5F5',
-    borderLeftWidth: 5,
-    borderLeftColor: '#EF4444', // Red left highlight
-    borderColor: '#FECACA',
+    borderColor: colors.dangerBorder,
   },
-  repaidCard: {
-    backgroundColor: '#F8FAFC',
-    borderColor: '#E2E8F0',
-    opacity: 0.85,
+  overdueStripe: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 4,
+    backgroundColor: colors.danger,
   },
-  topRow: {
+  row: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 8,
+    alignItems: 'center',
   },
-  nameContainer: {
+  body: {
     flex: 1,
+    marginLeft: spacing.md,
+    marginRight: spacing.sm,
   },
   friendName: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '700',
-    color: '#0F172A',
-    marginBottom: 2,
+    color: colors.text,
   },
-  dateLabel: {
+  subline: {
     fontSize: 13,
-    color: '#64748B',
+    color: colors.textMuted,
+    marginTop: 3,
+  },
+  amountCol: {
+    alignItems: 'flex-end',
   },
   amount: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1E293B',
-    marginLeft: 8,
-  },
-  overdueText: {
-    color: '#DC2626',
+    fontSize: 17,
+    fontWeight: '800',
+    color: colors.text,
+    fontVariant: ['tabular-nums'],
   },
   repaidAmount: {
-    color: '#16A34A',
-    textDecorationLine: 'none',
+    color: colors.textFaint,
+    textDecorationLine: 'line-through',
   },
-  mutedText: {
-    color: '#64748B',
-  },
-  overdueBanner: {
-    backgroundColor: '#FEE2E2',
-    paddingVertical: 4,
+  pill: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 8,
-    borderRadius: 4,
-    alignSelf: 'flex-start',
-    marginBottom: 10,
+    paddingVertical: 3,
+    borderRadius: radius.pill,
+    marginTop: 6,
   },
-  overdueBannerText: {
-    color: '#B91C1C',
-    fontSize: 12,
-    fontWeight: '600',
+  pillDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 5,
   },
-  bottomRow: {
+  pillText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  footer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: 8,
+    marginTop: spacing.md,
+    paddingTop: spacing.md,
     borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
+    borderTopColor: colors.border,
   },
-  badgeGroup: {
+  footerHint: {
+    fontSize: 12,
+    color: colors.textMuted,
+  },
+  receiptChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-  },
-  pendingBadge: {
-    backgroundColor: '#EFF6FF',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 4,
-  },
-  pendingBadgeText: {
-    color: '#2563EB',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  overdueBadge: {
-    backgroundColor: '#FEE2E2',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 4,
-  },
-  overdueBadgeText: {
-    color: '#DC2626',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  repaidBadge: {
-    backgroundColor: '#DCFCE7',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 4,
-  },
-  repaidBadgeText: {
-    color: '#16A34A',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  receiptButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F1F5F9',
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-    borderRadius: 4,
+    backgroundColor: colors.surfaceMuted,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingRight: 10,
+    paddingLeft: 4,
+    paddingVertical: 4,
+    borderRadius: radius.pill,
   },
   receiptThumb: {
-    width: 20,
-    height: 20,
-    borderRadius: 3,
-    marginRight: 4,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    marginRight: 6,
+    backgroundColor: colors.border,
   },
   receiptLabel: {
-    fontSize: 11,
-    color: '#475569',
-    fontWeight: '500',
+    fontSize: 12,
+    color: colors.text,
+    fontWeight: '600',
   },
   repayButton: {
-    backgroundColor: '#16A34A',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-  },
-  disabledButton: {
-    opacity: 0.6,
+    backgroundColor: colors.successSoft,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: radius.sm,
   },
   repayButtonText: {
-    color: '#FFFFFF',
+    color: colors.success,
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: '700',
   },
 });

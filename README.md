@@ -135,6 +135,17 @@ npm run start
 ```
 Scan the QR code displayed in your terminal using the **Expo Go** app on Android or the iOS Camera app.
 
+### 4. (Optional) Run the App in a Browser
+
+No phone or emulator handy? The app also runs on the web, shown inside a phone-sized frame:
+
+```bash
+cd mobile
+npm run web
+```
+
+Open `http://localhost:8081`. On web, the session is kept in `localStorage` (instead of SecureStore) and the date picker and receipt upload use the browser's native inputs.
+
 ---
 
 ## 🔑 Where to Find the Mock OTP

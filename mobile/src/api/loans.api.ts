@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import { apiClient } from './client';
 
 export interface Loan {
@@ -70,12 +71,19 @@ export async function uploadReceipt(loanId: string, fileUri: string): Promise<Lo
   const ext = match ? match[1].toLowerCase() : 'jpg';
   const mimeType = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
 
-  // React Native FormData file shape
-  formData.append('receipt', {
-    uri: fileUri,
-    name: filename,
-    type: mimeType,
-  } as unknown as Blob);
+  if (Platform.OS === 'web') {
+    // On web the picker returns a blob:/data: URI; convert it to a real Blob
+    const blob = await (await fetch(fileUri)).blob();
+    const webExt = blob.type.split('/')[1] || 'jpg';
+    formData.append('receipt', blob, `receipt.${webExt}`);
+  } else {
+    // React Native FormData file shape
+    formData.append('receipt', {
+      uri: fileUri,
+      name: filename,
+      type: mimeType,
+    } as unknown as Blob);
+  }
 
   const res = await apiClient.post<Loan>(`/loans/${loanId}/receipt`, formData, {
     headers: {
