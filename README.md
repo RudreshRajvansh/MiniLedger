@@ -19,6 +19,8 @@ It's a full-stack project: a **React Native (Expo)** app talking to a **Node.js 
   </tr>
 </table>
 
+🎬 **[Watch the 2½-minute demo video](docs/demo/MiniLedger-demo.mp4)**: login, adding a loan with a receipt, chasing an overdue loan, marking it repaid, and the backend's API calls as they happen.
+
 ---
 
 ## What it does
